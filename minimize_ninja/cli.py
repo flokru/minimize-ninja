@@ -23,66 +23,16 @@ def cli(verbosity, log_file):
     pass
 
 
-@click.command(help="Get a Keynote file into shape by losing " "unnecessary weight")
-@click.option(
-    "-q",
-    "--quality",
-    "quality",
-    default=0,
-    type=int,
-    show_default=True,
-    help="Control the quality of the resulting Keynote file. The "
-    "level [0–3] controls quality vs. size with 0 resulting "
-    "in the highest quality/largest size and 3 in lowest "
-    "quality/smallest size. Zero is the default and best "
-    "setting to retain a reasonable quality to store "
-    "your Keynote files. Levels 1–3 are targeted for creating "
-    "reasonably-sized PDF exports. DO NOT USE LEVELS 1–3 TO "
-    "OPTIMIZE YOUR KEYNOTE FILE PERMANENTLY AS IMAGES WILL BE "
-    "DEGRADED IN QUALITY!",
-)
-@click.option(
-    "-p",
-    "--export-pdf",
-    "export_pdf",
-    help="Export Keynote presentation to PDF after optimizing",
-    is_flag=True,
-)
-@click.option(
-    "--keep-unpacked",
-    "keep_unpacked",
-    help="Do not delete unpacked Keynote data",
-    is_flag=True,
-)
-@click.option(
-    "--resize-factor",
-    "resize_factor",
-    default=2.0,
-    show_default=True,
-    help="Resizing factor to keep acceptable resolution for images",
-)
-@click.option(
-    "--jpeg-compression",
-    "jpeg_compression",
-    default=85,
-    show_default=True,
-    help="JPEG quality setting for compression (0–100, default: 85)",
-)
-@click.option(
-    "--png-convert",
-    "png_convert",
-    is_flag=True,
-    help="Try to convert PNG files to JPEG to save additional space",
-)
-@click.argument("keynote_file", type=click.Path(exists=True))
-def slim(
-    quality,
+def slim_file(
     keynote_file,
-    export_pdf,
-    keep_unpacked,
-    resize_factor,
-    jpeg_compression,
-    png_convert,
+    quality=0,
+    export_pdf=False,
+    pdf_all_stages=False,
+    keep_unpacked=False,
+    resize_factor=2.0,
+    jpeg_compression=85,
+    png_convert=False,
+    pdf_suffix='',
 ):
     resources = read_config()
     logger = get_logger()
@@ -298,7 +248,7 @@ def slim(
         shutil.rmtree(kf.path_unpacked)
 
     if export_pdf:
-        filename_pdf = str(kf.path_keynote.stem) + ".pdf"
+        filename_pdf = str(kf.path_keynote.stem) + f"{pdf_suffix}.pdf"
         path_pdf = Path.cwd() / filename_pdf
         logger.info(
             f"Calling AppleScript to export optimized Keynote file to "
@@ -312,17 +262,112 @@ def slim(
         script = f"""
             tell application "Keynote"
               set keynote_file to open ("{kf.path_repacked}" as POSIX file)
-              export keynote_file to ("{path_pdf}" as POSIX file) as PDF with properties {{ PDF image quality: Better, skipped slides: false, all stages: true }}
+              export keynote_file to ("{path_pdf}" as POSIX file) as PDF with properties {{ PDF image quality: Better, skipped slides: false, all stages: {'true' if pdf_all_stages else 'false'} }}
               close keynote_file saving no
             end tell
             """
+        print(script)
         r = applescript.run(script)
         if r.code == 0:
             logger.debug(f"Removing optimized Keynote file…")
             kf.path_repacked.unlink()
 
 
+@click.command(help="Get a Keynote file into shape by losing " "unnecessary weight")
+@click.option(
+    "-q",
+    "--quality",
+    "quality",
+    default=0,
+    type=int,
+    show_default=True,
+    help="Control the quality of the resulting Keynote file. The "
+    "level [0–3] controls quality vs. size with 0 resulting "
+    "in the highest quality/largest size and 3 in lowest "
+    "quality/smallest size. Zero is the default and best "
+    "setting to retain a reasonable quality to store "
+    "your Keynote files. Levels 1–3 are targeted for creating "
+    "reasonably-sized PDF exports. DO NOT USE LEVELS 1–3 TO "
+    "OPTIMIZE YOUR KEYNOTE FILE PERMANENTLY AS IMAGES WILL BE "
+    "DEGRADED IN QUALITY!",
+)
+@click.option(
+    "-p",
+    "--export-pdf",
+    "export_pdf",
+    help="Export Keynote presentation to PDF after optimizing",
+    is_flag=True,
+)
+@click.option(
+    "--pdf-all-stages",
+    "pdf_all_stages",
+    help="Keep all animation stages in case of PDF export",
+    is_flag=True,
+)
+@click.option(
+    "--keep-unpacked",
+    "keep_unpacked",
+    help="Do not delete unpacked Keynote data",
+    is_flag=True,
+)
+@click.option(
+    "--resize-factor",
+    "resize_factor",
+    default=2.0,
+    show_default=True,
+    help="Resizing factor to keep acceptable resolution for images",
+)
+@click.option(
+    "--jpeg-compression",
+    "jpeg_compression",
+    default=85,
+    show_default=True,
+    help="JPEG quality setting for compression (0–100, default: 85)",
+)
+@click.option(
+    "--png-convert",
+    "png_convert",
+    is_flag=True,
+    help="Try to convert PNG files to JPEG to save additional space",
+)
+@click.argument("keynote_file", type=click.Path(exists=True))
+def slim(
+    keynote_file,
+    quality,
+    export_pdf,
+    pdf_all_stages,
+    keep_unpacked,
+    resize_factor,
+    jpeg_compression,
+    png_convert,
+):
+    slim_file(
+        quality, keynote_file, export_pdf, pdf_all_stages, keep_unpacked,
+        resize_factor, jpeg_compression, png_convert)
+
+
+@click.command(help="Minimize and export Keynote file to PDF")
+@click.argument("keynote_file", type=click.Path(exists=True))
+@click.option(
+    "--pdf-all-stages",
+    "pdf_all_stages",
+    help="Keep all animation stages in case of PDF export",
+    is_flag=True,
+)
+def autopdf(keynote_file, pdf_all_stages):
+    slim_file(
+        keynote_file, quality=0, export_pdf=True,
+        pdf_all_stages=pdf_all_stages, pdf_suffix='_q0')
+    slim_file(
+        keynote_file, quality=1, export_pdf=True,
+        pdf_all_stages=pdf_all_stages, pdf_suffix='_q1')
+    slim_file(
+        keynote_file, quality=2, export_pdf=True,
+        pdf_all_stages=pdf_all_stages, pdf_suffix='_q2')
+
+
 cli.add_command(slim)
+cli.add_command(autopdf)
 
 
 def main():

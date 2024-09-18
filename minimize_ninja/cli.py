@@ -342,7 +342,7 @@ def slim(
     png_convert,
 ):
     slim_file(
-        quality, keynote_file, export_pdf, pdf_all_stages, keep_unpacked,
+        keynote_file, quality, export_pdf, pdf_all_stages, keep_unpacked,
         resize_factor, jpeg_compression, png_convert)
 
 

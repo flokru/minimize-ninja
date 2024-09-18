@@ -354,16 +354,49 @@ def slim(
     help="Keep all animation stages in case of PDF export",
     is_flag=True,
 )
-def autopdf(keynote_file, pdf_all_stages):
-    slim_file(
-        keynote_file, quality=0, export_pdf=True,
-        pdf_all_stages=pdf_all_stages, pdf_suffix='_q0')
-    slim_file(
-        keynote_file, quality=1, export_pdf=True,
-        pdf_all_stages=pdf_all_stages, pdf_suffix='_q1')
-    slim_file(
-        keynote_file, quality=2, export_pdf=True,
-        pdf_all_stages=pdf_all_stages, pdf_suffix='_q2')
+@click.option(
+    "-q1",
+    "--quality1",
+    "quality1",
+    default=0,
+    type=int,
+    show_default=True,
+    help="Starting quality of the resulting Keynote files. The "
+    "level [0–3] controls quality vs. size with 0 resulting "
+    "in the highest quality/largest size and 3 in lowest "
+    "quality/smallest size. Zero is the default and best "
+    "setting to retain a reasonable quality to store "
+    "your Keynote files. Levels 1–3 are targeted for creating "
+    "reasonably-sized PDF exports. DO NOT USE LEVELS 1–3 TO "
+    "OPTIMIZE YOUR KEYNOTE FILE PERMANENTLY AS IMAGES WILL BE "
+    "DEGRADED IN QUALITY!",
+)
+@click.option(
+    "-q2",
+    "--quality2",
+    "quality2",
+    default=2,
+    type=int,
+    show_default=True,
+    help="End quality of the resulting Keynote files. The "
+    "level [0–3] controls quality vs. size with 0 resulting "
+    "in the highest quality/largest size and 3 in lowest "
+    "quality/smallest size. Zero is the default and best "
+    "setting to retain a reasonable quality to store "
+    "your Keynote files. Levels 1–3 are targeted for creating "
+    "reasonably-sized PDF exports. DO NOT USE LEVELS 1–3 TO "
+    "OPTIMIZE YOUR KEYNOTE FILE PERMANENTLY AS IMAGES WILL BE "
+    "DEGRADED IN QUALITY!",
+)
+def autopdf(keynote_file, pdf_all_stages, quality1, quality2):
+    resources = read_config()
+    logger = get_logger()
+    for quality in range(quality1, quality2 + 1):
+        logger.info(f'Reducing {keynote_file} to PDF for quality '
+                    f'setting q={quality}')
+        slim_file(
+            keynote_file, quality=quality, export_pdf=True,
+            pdf_all_stages=pdf_all_stages, pdf_suffix=f'_q{quality}')
 
 
 cli.add_command(slim)

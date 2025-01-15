@@ -1,5 +1,6 @@
 import subprocess
 import uuid
+import tempfile
 from pathlib import Path
 
 import humanize
@@ -17,8 +18,9 @@ class KeynoteFile(object):
             self._path_keynote = path_keynote
             self._path_unpacked = Path.cwd()
             self._is_unpacked = False
+            tmp_path = Path(tempfile.gettempdir())
             while self._path_unpacked.exists():
-                self._path_unpacked = Path.cwd() / str(uuid.uuid4())[0:8]
+                self._path_unpacked = tmp_path / str(uuid.uuid4())[0:8]
             filename_repacked = str(self._path_keynote.stem) + "_tiffy.key"
         elif path_unpacked is not None:
             self._path_keynote = None
@@ -29,6 +31,7 @@ class KeynoteFile(object):
         self._images_dict = None
         self._slides = None
         self._metadata = None
+        self._document_stylesheet = None
 
     def __repr__(self):
         if self.path_keynote is not None:
@@ -64,6 +67,16 @@ class KeynoteFile(object):
         path_metadata = self.path_unpacked / "Index" / "Metadata.iwa.yaml"
         self._metadata = TiffyYaml(path_metadata)
 
+    def _load_document_stylesheet(self):
+        if not self.is_unpacked:
+            self._logger.error(
+                f"{self} cannot load document stylesheet as Keynote file is not unpacked yet!"
+            )
+            return
+        path_document_stylesheet_data = \
+                self.path_unpacked / "Index" / "DocumentStylesheet.iwa.yaml"
+        self._document_stylesheet = TiffyYaml(path_document_stylesheet_data)
+
     def _load_image_metadata(self):
         if not self.is_unpacked:
             self._logger.error(
@@ -96,7 +109,7 @@ class KeynoteFile(object):
             for archive in chunk["archives"]:
                 for obj in archive["objects"]:
                     if obj["_pbtype"] == "KN.SlideNodeArchive":
-                        slide = KeynoteSlide(obj, path_unpacked)
+                        slide = KeynoteSlide(obj, self.path_unpacked)
                         self._slides.append(slide)
                         slide.build_file_references(self.images_dict)
         slides_numbered = [slide for slide in self._slides if not slide.is_skipped]
@@ -148,6 +161,13 @@ class KeynoteFile(object):
         if self._metadata is None:
             self._load_metadata()
         return self._metadata
+
+    @property
+    def document_stylesheet(self):
+        if self._document_stylesheet is None:
+            self._load_document_stylesheet()
+        return self._document_stylesheet
+
 
     @property
     def slides(self):
@@ -431,3 +451,94 @@ class ImageFile(object):
                 f"{(self.lost_weight_optimized * 100.0):.1f}% "
                 f"reduction)."
             )
+
+
+class KeynoteSlide(object):
+    def __init__(self, document_yaml, path_unpacked):
+        self._document_yaml = document_yaml
+        identifier = document_yaml['slide']['identifier']
+        self._identifier = identifier
+        self._path_unpacked = path_unpacked
+        self._path_slide = path_unpacked / 'Index' / f'Slide-{identifier}.iwa.yaml'
+        self._data_references = {}
+        self._size_objects = None
+        self._slide_number = None
+        try:
+            self._tiffy_yaml = TiffyYaml(self._path_slide)
+        except FileNotFoundError:
+            try:
+                self._path_slide = path_unpacked / 'Index' / f'TemplateSlide-{identifier}.iwa.yaml'
+                self._tiffy_yaml = TiffyYaml(self._path_slide)
+            except FileNotFoundError:
+                self._path_slide = path_unpacked / 'Index' / 'Slide.iwa.yaml'
+                self._tiffy_yaml = TiffyYaml(self._path_slide)
+
+                if (self._identifier == self._tiffy_yaml.yaml['chunks'][0]['archives'][0]['header']['identifier']):
+                    pass
+                else:
+                    self._path_slide = path_unpacked / 'Index' / 'TemplateSlide.iwa.yaml'
+                    self._tiffy_yaml = TiffyYaml(self._path_slide)
+                    if (self._identifier == self._tiffy_yaml.yaml['chunks'][0]['archives'][0]['header']['identifier']):
+                        pass
+                    else:
+                        raise FileNotFoundError(f'No slide file found for slide id {identifier}!')
+
+    def __repr__(self):
+        symbol = f'✅'
+        if self.is_skipped:
+            symbol = '❌'
+        slide_number = '    '
+        if self.slide_number:
+            slide_number = f'p{self.slide_number:>3}'
+        prefix = '  ' * max(self.document_yaml['depth'] - 1, 0)
+        return f'{slide_number} {prefix} | KeynoteSlide({symbol} (id: {self.identifier} -> {self.path_slide.name}))'
+
+    def build_file_references(self, image_dict={}):
+        for chunk in self._tiffy_yaml.yaml['chunks']:
+            for archive in chunk['archives']:
+                for object in archive['objects']:
+                    identifier = 0
+                    if object['_pbtype'] in 'TSD.ImageArchive':
+                        identifier = \
+                            object.get('data', {}).get('identifier', 0)
+                    elif object['_pbtype'] in 'TSD.MovieArchive':
+                        identifier = \
+                            object.get('movieData', {}).get('identifier', 0)
+                    else:
+                        continue
+                    self._data_references[identifier] = image_dict.get(identifier, None)
+
+        sizes = [
+            obj.size_current for identifier, obj in self._data_references.items()
+            if obj is not None
+        ]
+        self._size_objects = sum(sizes)
+
+
+    @property
+    def is_skipped(self):
+        return self.document_yaml['isSkipped']
+
+    @property
+    def document_yaml(self):
+        return self._document_yaml
+
+    @property
+    def identifier(self):
+        return self._identifier
+
+    @property
+    def size_objects(self):
+        return self._size_objects
+
+    @property
+    def slide_number(self):
+        return self._slide_number
+
+    @property
+    def path_slide(self):
+        return self._path_slide
+
+    @slide_number.setter
+    def slide_number(self, value):
+        self._slide_number = value

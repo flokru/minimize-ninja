@@ -23,6 +23,44 @@ def cli(verbosity, log_file):
     pass
 
 
+def fix_fa_duotones_file(
+    keynote_file
+):
+    resources = read_config()
+    logger = get_logger()
+    console = resources["console"]
+    path_packed = Path(keynote_file)
+
+    kf = KeynoteFile(resources, path_keynote=path_packed)
+    kf.unpack()
+    console.print()
+
+    logger.info(f'Loading document stylesheet {kf.document_stylesheet} to '
+                'search for FontAwesome Duotone icons…')
+    yaml = kf.document_stylesheet.yaml
+
+    counter = 0
+    for chunk in yaml['chunks']:
+        for archive in chunk['archives']:
+            character_styles = [
+                object for object in archive['objects']
+                if (object['_pbtype'] == 'TSWP.ParagraphStyleArchive'
+                    or object['_pbtype'] == 'TSWP.CharacterStyleArchive')
+                and object.get('charProperties', {}).get('fontName', '') == 'FontAwesome6Duotone-Solid'
+            ]
+            for character_style in character_styles:
+                character_style['charProperties']['bold'] = True
+                counter += 1
+
+    logger.info(f'Found {counter} occurrences of Duotone icons that are '
+                'switched to \'Solid\'')
+
+    kf.document_stylesheet.save()
+
+    kf.repack()
+
+
+
 def slim_file(
     keynote_file,
     quality=0,
@@ -399,8 +437,19 @@ def autopdf(keynote_file, pdf_all_stages, quality1, quality2):
             pdf_all_stages=pdf_all_stages, pdf_suffix=f'_q{quality}')
 
 
+@click.command(help="Fix all FontAwesome Duotone occurrences to solid")
+@click.argument("keynote_file", type=click.Path(exists=True))
+def fix_fa_duotones(keynote_file):
+    resources = read_config()
+    logger = get_logger()
+    logger.info(f'Fixing all FontAwesome Duotone occurrences in {keynote_file} '
+                ' to solid font weight.')
+    fix_fa_duotones_file(keynote_file)
+
+
 cli.add_command(slim)
 cli.add_command(autopdf)
+cli.add_command(fix_fa_duotones)
 
 
 def main():

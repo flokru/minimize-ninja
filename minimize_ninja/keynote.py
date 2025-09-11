@@ -284,7 +284,16 @@ class ImageFile(object):
             has_alpha = image.alpha_channel
             for format in formats:
                 if format in ["jpg"] and has_alpha:
-                    continue
+                    self._logger.debug(f"  Has alpha channel…")
+                    range = image.range_channel('alpha')
+                    print(image.range_channel('alpha'))
+                    print(image.quantum_range)
+                    if (
+                        int(range[0]) == int(image.quantum_range) == int(range[1])
+                    ):
+                        pass
+                    else:
+                        continue
                 self._logger.debug(f"  Trying {format}…")
                 image.format = format
                 if format == "jpg":
@@ -421,7 +430,7 @@ class ImageFile(object):
             try:
                 r = subprocess.run(
                     f'"/Users/fkruse/Documents/Point 8/fkruse/pdfsizeopt/'
-                    f'pdfsizeopt" '
+                    f'pdfsizeooopt" '
                     f'"{self._path.name}" '
                     f'"{tmp_file}" ',
                     shell=True,

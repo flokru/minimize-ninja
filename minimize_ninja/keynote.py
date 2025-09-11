@@ -286,8 +286,6 @@ class ImageFile(object):
                 if format in ["jpg"] and has_alpha:
                     self._logger.debug(f"  Has alpha channel…")
                     range = image.range_channel('alpha')
-                    print(image.range_channel('alpha'))
-                    print(image.quantum_range)
                     if (
                         int(range[0]) == int(image.quantum_range) == int(range[1])
                     ):

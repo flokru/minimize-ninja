@@ -98,6 +98,11 @@ def slim_file(
             jpeg_compression = 70
             png_convert = True
             export_pdf = True
+        case 4:
+            resize_factor = 0.75
+            jpeg_compression = 65
+            png_convert = True
+            export_pdf = True
 
     if resize_factor < 2.0:
         console.print()
@@ -413,7 +418,7 @@ def slim(
     "-q2",
     "--quality2",
     "quality2",
-    default=2,
+    default=4,
     type=int,
     show_default=True,
     help="End quality of the resulting Keynote files. The "

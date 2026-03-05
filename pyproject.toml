@@ -19,7 +19,8 @@ version = "0.1.0"
 # dynamic = ["version"]
 dependencies = [
     "GitPython", "pyyaml", "tqdm", "wand",
-    "pendulum", "click", "rich", "keynote_parser",
+    "pendulum", "click", "rich",
+    "keynote-parser @ git+https://github.com/point8/keynote-parser.git",
     "humanize", "pyoxipng", "applescript",
 ]
 

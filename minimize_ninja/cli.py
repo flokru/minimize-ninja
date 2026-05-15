@@ -204,7 +204,7 @@ def slim_file(
         f"how we can cut some calories by optimizing your diet plan "
         f"(i.e. resize images to an optimal resolution)…"
     )
-    all_yaml = [TiffyYaml(file) for file in kf.path_index.iterdir()]
+    all_yaml = [TiffyYaml(file) for file in kf.path_index.rglob("*.iwa.yaml")]
     logger.debug(
         f"Searching {len(all_yaml)} metadata YAML files for "
         f"references to the {len(images_dict.keys())} image files…"
